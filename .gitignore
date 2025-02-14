@@ -15,3 +15,6 @@ venv/
 # Ignore log and temp files
 *.log
 *.tmp
+
+#database
+.users.db
