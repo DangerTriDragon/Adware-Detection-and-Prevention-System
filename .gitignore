@@ -17,4 +17,4 @@ venv/
 *.tmp
 
 #database
-.users.db
+users.db
