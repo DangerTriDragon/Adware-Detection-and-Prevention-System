@@ -670,7 +670,7 @@ class LoginApp:
             self.root.destroy()
 
             # Run main.py
-            subprocess.Popen(["python", "C:\\Users\\Narvi\\Downloads\\Adware\\New folder12\\New folder\\main.py"])
+            subprocess.Popen(["python", "main.py"])
         else:
             messagebox.showerror("Error", "Invalid Email or Password")
 
