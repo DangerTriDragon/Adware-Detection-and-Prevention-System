@@ -3,7 +3,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
+/data
+/logs
+/quarantine
 # Ignore virtual environments
 venv/
 .env/
