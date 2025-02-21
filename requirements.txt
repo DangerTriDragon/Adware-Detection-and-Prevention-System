@@ -1,1 +1,7 @@
-ttkthemes
+bcrypt==4.0.1
+Pillow==10.0.0
+ttkthemes==3.2.2
+customtkinter==5.2.1
+reportlab==4.0.4
+watchdog==3.0.0
+yara-python==4.3.1
