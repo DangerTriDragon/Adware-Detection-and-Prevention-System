@@ -129,64 +129,90 @@ class ScannerTab(ctk.CTkFrame):
         self.progress_bar.set(progress)
         if message:
             self.progress_label.configure(text=message)
-        
+
+    def quarantine_file(self, file_path):
+        """Quarantine a file without circular imports"""
+        try:
+            # Import inside method to avoid circular imports
+            from quarantine import QuarantineTab
+            if QuarantineTab.add_quarantined_item(file_path):
+                self.results_text.insert("end", f"✅ File quarantined: {file_path}\n")
+                self.results_text.see("end")
+                return True
+            else:
+                self.results_text.insert("end", f"❌ Failed to quarantine: {file_path}\n")
+                self.results_text.see("end")
+                return False
+        except Exception as e:
+            self.logger.log(f"Error quarantining file: {str(e)}")
+            return False
+
+
     def scan_file_for_adware(self, file_path):
         try:
             matches = self.rules.match(file_path)
             if matches:
-                result_parts = [f"⚠️ ADWARE DETECTED in {file_path}"]
-                result_parts.append("\nDetected Rules:")
-                
-                for match in matches:
+                file_name = os.path.basename(file_path)
+            
+                # Create header
+                result = f"⚠️ ADWARE DETECTED: {file_name}\n"
+                result += f"📂 {os.path.dirname(file_path)}\n"
+                result += "─────────────────────────────────────\n"
+            
+                # List format for each detection
+                for i, match in enumerate(matches, 1):
                     severity = match.meta.get('severity', 'unknown')
                     description = match.meta.get('description', 'No description available')
-                    
-                    severity_emoji = {
-                        'low': '🟡',
-                        'medium': '🟠',
+                
+                    # Map severity to icon
+                    severity_icon = {
+                        'low': '🟢',
+                        'medium': '🟡',
                         'high': '🔴',
                         'critical': '⛔'
                     }.get(severity.lower(), '⚠️')
-                    
-                    result_parts.append(f"\n{severity_emoji} Rule: {match.rule}")
-                    result_parts.append(f"   Severity: {severity.upper()}")
-                    result_parts.append(f"   Description: {description}")
                 
-                result = "\n".join(result_parts)
+                    # Add list item with bullet point
+                    result += f" • Rule #{i}: {match.rule}\n"
+                    result += f"   {severity_icon} Severity: {severity.upper()}\n"
+                    result += f"   ℹ️ {description}\n\n"
+            
                 self.logger.log(f"Adware detected in {file_path}")
-                
-                # Add to detected files if not auto-quarantining
+            
+                # Handle quarantining
                 if not self.auto_quarantine_var.get():
                     self.add_detected_file(file_path)
                 else:
-                    # Auto-quarantine for real-time protection
-                    from quarantine import QuarantineTab
-                    QuarantineTab.add_quarantined_item(file_path)
-                
+                    self.quarantine_file(file_path)
+            
                 return True, result
             else:
                 result = f"✅ No adware detected in {file_path}"
                 return False, result
         except Exception as e:
-            result = f"Error scanning {file_path}: {str(e)}"
+            result = f"❌ Error scanning {file_path}: {str(e)}"
             self.logger.log(result)
             return False, result
     
     def toggle_file_folder_scan(self):
         if not self.scanning:
-            # Allow selection of both files and folders
-            paths = filedialog.askdirectory(title="Select folder to scan")
-            if paths:  # If a folder was selected
+            # First prompt for folder selection
+            folder = filedialog.askdirectory(title="Select folder to scan (Cancel for file selection)")
+        
+            if folder:
+                # Folder was selected
                 self.scanning = True
                 self.scan_file_btn.configure(text="Stop Scanning")
-                self.start_file_folder_scan([paths])
-            else:  # Try file selection if folder selection was cancelled
+                self.start_file_folder_scan([folder])
+            else:
+                # Try file selection
                 files = filedialog.askopenfilenames(title="Select files to scan")
                 if files:
                     self.scanning = True
                     self.scan_file_btn.configure(text="Stop Scanning")
                     self.start_file_folder_scan(files)
         else:
+            # Stop scanning
             self.scanning = False
             self.scan_file_btn.configure(text="Scan Files & Folders")
     
@@ -373,17 +399,18 @@ class ScannerTab(ctk.CTkFrame):
         if not files_to_quarantine:
             return
             
-        from quarantine import QuarantineTab
+        quarantined_count = 0
         for file_path in files_to_quarantine:
-            if QuarantineTab.add_quarantined_item(file_path):
+            if self.quarantine_file(file_path):
                 # Remove from detected list and UI
                 self.detected_files.remove(file_path)
                 for widget in self.detected_frame.winfo_children():
                     if isinstance(widget, ctk.CTkCheckBox) and widget.cget("text") == file_path:
                         widget.destroy()
                 del self.detection_checkboxes[file_path]
-        
-        # Update quarantine button state
+                quarantined_count += 1
+    
+    # Update quarantine button state
         if not self.detected_files:
             self.quarantine_selected_btn.configure(state="disabled")
 

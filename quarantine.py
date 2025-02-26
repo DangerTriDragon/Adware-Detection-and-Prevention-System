@@ -3,6 +3,8 @@ import customtkinter as ctk
 from logger import Logger
 import os
 import shutil
+import uuid
+
 
 class QuarantineTab(ctk.CTkFrame):
     _instance = None
@@ -17,10 +19,18 @@ class QuarantineTab(ctk.CTkFrame):
         self.setup_ui()
         
     def setup_quarantine_folder(self):
-        self.quarantine_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quarantine")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.quarantine_dir = os.path.join(current_dir, "quarantine")
         if not os.path.exists(self.quarantine_dir):
             os.makedirs(self.quarantine_dir)
     
+        # Create a mapping file to store original paths
+        self.path_mapping_file = os.path.join(self.quarantine_dir, "path_mappings.txt")
+        if not os.path.exists(self.path_mapping_file):
+            # Create an empty file
+            with open(self.path_mapping_file, 'w') as f:
+                pass
+            
     def setup_ui(self):
         # Main container
         self.main_frame = ctk.CTkFrame(self)
@@ -86,11 +96,15 @@ class QuarantineTab(ctk.CTkFrame):
             return False
             
         try:
-            file_path = os.path.normpath(file_path)
-            quarantine_name = f"quarantined_{os.path.basename(file_path)}"
+            unique_id = str(uuid.uuid4())[:8]
+            quarantine_name = f"quarantined_{unique_id}_{os.path.basename(file_path)}"
             quarantine_path = os.path.join(cls._instance.quarantine_dir, quarantine_name)
             
             shutil.move(file_path, quarantine_path)
+            
+            # Store the mapping of quarantine path to original path
+            with open(cls._instance.path_mapping_file, 'a') as f:
+                f.write(f"{quarantine_path}|{file_path}\n")
             
             cls._instance.quarantined_items.append({
                 'original_path': file_path,
@@ -142,15 +156,26 @@ class QuarantineTab(ctk.CTkFrame):
             # Clear current items
             self.quarantined_items.clear()
         
+            # Load path mappings from file
+            path_mappings = {}
+            if os.path.exists(self.path_mapping_file):
+                with open(self.path_mapping_file, 'r') as f:
+                    for line in f:
+                        if line.strip():
+                            parts = line.strip().split('|', 1)
+                            if len(parts) == 2:
+                                quarantine_path, original_path = parts
+                                path_mappings[quarantine_path] = original_path
+        
             # Scan quarantine directory for files
             for filename in os.listdir(self.quarantine_dir):
-                if filename.startswith("quarantined_"):
+                if filename.startswith("quarantined_") and not filename == "path_mappings.txt":
                     quarantine_path = os.path.join(self.quarantine_dir, filename)
                     original_name = filename.replace("quarantined_", "", 1)
                 
                     # Try to reconstruct original path from our naming convention
                     # This is a basic implementation - you might want to store original paths in a separate file
-                    original_path = os.path.join(os.path.expanduser("~"), original_name)
+                    original_path = path_mappings.get(quarantine_path, "Unknown original location")
                 
                     self.quarantined_items.append({
                     'original_path': original_path,

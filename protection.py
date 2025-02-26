@@ -7,6 +7,8 @@ import yara
 from logger import Logger
 import threading
 import time
+import sys
+import os
 
 class AdwareEventHandler(FileSystemEventHandler):
     def __init__(self, protection_tab):
@@ -170,3 +172,14 @@ class ProtectionTab(ctk.CTkFrame):
             update()
         else:
             self.after(0, update)
+            
+    def add_to_quarantine(self, file_path):
+        try:
+            # Import is inside the method to avoid circular imports
+            from quarantine import QuarantineTab
+            if QuarantineTab.add_quarantined_item(file_path):
+                self.update_activity(f"✅ File has been quarantined: {file_path}")
+            else:
+                self.update_activity(f"❌ Failed to quarantine file: {file_path}")
+        except Exception as e:
+            self.logger.log(f"Error quarantining file: {str(e)}")
